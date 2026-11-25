@@ -351,16 +351,16 @@ window.JUMBARA_ADMIN = (() => {
         <div class="card">
           <h3 style="margin-bottom:10px;">Daftar Sekolah (Impor CSV)</h3>
           <p class="text-muted" style="font-size:0.84rem; margin:0 0 10px;">
-            Unggah file CSV (kolom pertama = nama sekolah) atau tempel daftar sekolah di bawah.
+            Unggah file CSV format <code>npsn;nama;jenjang;kecamatan;alamat</code> (pemisah <code>;</code> atau <code>,</code>) atau tempel daftar sekolah di bawah.
           </p>
           <input type="file" id="csv-file" accept=".csv,.txt" class="input" style="padding:8px; margin-bottom:10px;" />
-          <textarea id="csv-text" class="textarea" placeholder="SD Negeri 1 Purbalingga&#10;SMP Negeri 2 Purbalingga"></textarea>
+          <textarea id="csv-text" class="textarea" placeholder="npsn;nama;jenjang;kecamatan;alamat&#10;20303588;SD NEGERI 1 PURBALINGGA LOR;Mula;KEC. PURBALINGGA;PURBALINGGA LOR"></textarea>
           <button id="btn-import-csv" class="btn btn-primary btn-block" style="margin-top:10px;">Impor Sekolah</button>
 
-          <div style="margin-top:14px; max-height:220px; overflow-y:auto; border-top:1px solid var(--pmi-gray-lighter); padding-top:10px;">
+          <div style="margin-top:14px; max-height:240px; overflow-y:auto; border-top:1px solid var(--pmi-gray-lighter); padding-top:10px;">
             <strong style="font-size:0.85rem;">Sekolah Terdaftar (${(data.sekolah || []).length})</strong>
-            <ul style="margin:6px 0 0; padding-left:18px; font-size:0.86rem;">
-              ${(data.sekolah || []).map((s) => `<li>${J.esc(s.nama)}</li>`).join('')}
+            <ul style="margin:6px 0 0; padding-left:18px; font-size:0.84rem;">
+              ${(data.sekolah || []).map((s) => `<li><strong>${J.esc(s.nama)}</strong>${s.jenjang || s.kecamatan ? ` <span class="text-muted">(${[s.jenjang, s.kecamatan].filter(Boolean).map(J.esc).join(' · ')})</span>` : ''}</li>`).join('')}
             </ul>
           </div>
         </div>

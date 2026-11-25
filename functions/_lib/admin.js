@@ -115,15 +115,28 @@ export async function computeStandingsAndReports(db, kegiatanId) {
   };
 }
 
-function parseCsvFirstCol(line) {
-  const s = line.trim();
-  if (!s) return '';
-  if (s.startsWith('"')) {
-    const end = s.indexOf('"', 1);
-    return end > 1 ? s.slice(1, end).trim() : s.slice(1).trim();
+function parseCsvRow(line, delimiter) {
+  const out = [];
+  let cur = '';
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '"') {
+      if (inQuotes && line[i + 1] === '"') {
+        cur += '"';
+        i++;
+      } else {
+        inQuotes = !inQuotes;
+      }
+    } else if (ch === delimiter && !inQuotes) {
+      out.push(cur.trim());
+      cur = '';
+    } else {
+      cur += ch;
+    }
   }
-  const comma = s.indexOf(',');
-  return (comma >= 0 ? s.slice(0, comma) : s).trim();
+  out.push(cur.trim());
+  return out;
 }
 
 export async function handleAdminAction(db, user, action, body, url) {
@@ -270,20 +283,77 @@ export async function handleAdminAction(db, user, action, body, url) {
   }
 
   if (action === 'admin_import_sekolah') {
-    const csvText = String(body.csv_text || '').trim();
+    const csvText = String(body.csv_text || '').replace(/^\uFEFF/, '').trim();
     if (!csvText) {
       return jsonError('Isi CSV sekolah kosong.', 400);
     }
-    const lines = csvText.split(/\r\n|\r|\n/);
-    let added = 0;
-    for (let idx = 0; idx < lines.length; idx++) {
-      const name = parseCsvFirstCol(lines[idx]);
-      if (!name || (idx === 0 && /^(nama|sekolah|nama_sekolah)$/i.test(name))) continue;
-      const res = await db.prepare('INSERT OR IGNORE INTO sekolah (nama) VALUES (?)').bind(name).run();
-      if (res.meta && res.meta.changes > 0) added++;
+    const lines = csvText.split(/\r\n|\r|\n/).filter((l) => l.trim() !== '');
+    if (lines.length === 0) {
+      return jsonError('Isi CSV sekolah kosong.', 400);
     }
-    await writeLog(db, user, 'impor_sekolah', `Impor CSV sekolah: ${added} sekolah baru ditambahkan.`);
-    return jsonResponse({ ok: true, added });
+
+    const firstLine = lines[0];
+    const delimiter = firstLine.includes(';') ? ';' : ',';
+    const headerCols = parseCsvRow(firstLine, delimiter).map((c) => c.toLowerCase());
+    const hasHeader = headerCols.includes('nama') || headerCols.includes('npsn') || headerCols.includes('sekolah') || headerCols.includes('nama_sekolah');
+
+    let idxNpsn = -1;
+    let idxNama = 0;
+    let idxJenjang = -1;
+    let idxKec = -1;
+    let idxAlamat = -1;
+
+    if (hasHeader) {
+      idxNpsn = headerCols.indexOf('npsn');
+      idxNama = headerCols.findIndex((h) => ['nama', 'sekolah', 'nama_sekolah'].includes(h));
+      if (idxNama < 0) idxNama = 0;
+      idxJenjang = headerCols.indexOf('jenjang');
+      idxKec = headerCols.indexOf('kecamatan');
+      idxAlamat = headerCols.indexOf('alamat');
+    } else if (parseCsvRow(firstLine, delimiter).length >= 4) {
+      // Assume npsn;nama;jenjang;kecamatan;alamat even without header
+      idxNpsn = 0;
+      idxNama = 1;
+      idxJenjang = 2;
+      idxKec = 3;
+      idxAlamat = 4;
+    }
+
+    const stmts = [];
+    const startIdx = hasHeader ? 1 : 0;
+    for (let i = startIdx; i < lines.length; i++) {
+      const cols = parseCsvRow(lines[i], delimiter);
+      const nama = String(cols[idxNama] || '').trim();
+      if (!nama) continue;
+      const npsn = idxNpsn >= 0 ? String(cols[idxNpsn] || '').trim() : '';
+      const jenjang = idxJenjang >= 0 ? String(cols[idxJenjang] || '').trim() : '';
+      const kecamatan = idxKec >= 0 ? String(cols[idxKec] || '').trim() : '';
+      const alamat = idxAlamat >= 0 ? String(cols[idxAlamat] || '').trim() : '';
+
+      stmts.push(
+        db.prepare(`
+          INSERT INTO sekolah (nama, npsn, jenjang, kecamatan, alamat)
+          VALUES (?, ?, ?, ?, ?)
+          ON CONFLICT(nama) DO UPDATE SET
+            npsn = CASE WHEN excluded.npsn <> '' THEN excluded.npsn ELSE sekolah.npsn END,
+            jenjang = CASE WHEN excluded.jenjang <> '' THEN excluded.jenjang ELSE sekolah.jenjang END,
+            kecamatan = CASE WHEN excluded.kecamatan <> '' THEN excluded.kecamatan ELSE sekolah.kecamatan END,
+            alamat = CASE WHEN excluded.alamat <> '' THEN excluded.alamat ELSE sekolah.alamat END
+        `).bind(nama, npsn, jenjang, kecamatan, alamat)
+      );
+    }
+
+    let totalChanges = 0;
+    for (let i = 0; i < stmts.length; i += 100) {
+      const chunk = stmts.slice(i, i + 100);
+      const results = await db.batch(chunk);
+      for (const r of results) {
+        if (r.meta && r.meta.changes > 0) totalChanges++;
+      }
+    }
+
+    await writeLog(db, user, 'impor_sekolah', `Impor CSV sekolah: ${stmts.length} baris diproses (${totalChanges} disimpan/diperbarui).`);
+    return jsonResponse({ ok: true, added: stmts.length });
   }
 
   if (action === 'admin_save_pos') {

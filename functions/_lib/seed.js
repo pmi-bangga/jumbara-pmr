@@ -9,7 +9,17 @@ import {
 
 async function ensureSchema(db) {
   const exists = await db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='akun'").first();
-  if (exists) return;
+  if (exists) {
+    const { results: cols } = await db.prepare('PRAGMA table_info(sekolah)').all();
+    const colNames = new Set((cols || []).map((c) => c.name));
+    const alterStmts = [];
+    if (!colNames.has('npsn')) alterStmts.push(db.prepare("ALTER TABLE sekolah ADD COLUMN npsn TEXT NOT NULL DEFAULT ''"));
+    if (!colNames.has('jenjang')) alterStmts.push(db.prepare("ALTER TABLE sekolah ADD COLUMN jenjang TEXT NOT NULL DEFAULT ''"));
+    if (!colNames.has('kecamatan')) alterStmts.push(db.prepare("ALTER TABLE sekolah ADD COLUMN kecamatan TEXT NOT NULL DEFAULT ''"));
+    if (!colNames.has('alamat')) alterStmts.push(db.prepare("ALTER TABLE sekolah ADD COLUMN alamat TEXT NOT NULL DEFAULT ''"));
+    if (alterStmts.length > 0) await db.batch(alterStmts);
+    return;
+  }
 
   const ddl = [
     `CREATE TABLE IF NOT EXISTS akun (
@@ -34,7 +44,11 @@ async function ensureSchema(db) {
     )`,
     `CREATE TABLE IF NOT EXISTS sekolah (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      nama TEXT NOT NULL UNIQUE
+      nama TEXT NOT NULL UNIQUE,
+      npsn TEXT NOT NULL DEFAULT '',
+      jenjang TEXT NOT NULL DEFAULT '',
+      kecamatan TEXT NOT NULL DEFAULT '',
+      alamat TEXT NOT NULL DEFAULT ''
     )`,
     `CREATE TABLE IF NOT EXISTS kontingen (
       id INTEGER PRIMARY KEY AUTOINCREMENT,

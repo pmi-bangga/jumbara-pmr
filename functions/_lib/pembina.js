@@ -16,7 +16,7 @@ export async function handlePembinaAction(db, user, action, body) {
     if (!kegiatan) {
       return jsonResponse({ ok: true, kegiatan: null, sekolah: [], kontingen: null, peserta: [] });
     }
-    const { results: schools } = await db.prepare('SELECT id, nama FROM sekolah ORDER BY nama ASC').all();
+    const { results: schools } = await db.prepare('SELECT id, nama, npsn, jenjang, kecamatan, alamat FROM sekolah ORDER BY kecamatan ASC, nama ASC').all();
 
     const kontingen = await db.prepare(`
       SELECT k.*, s.nama AS sekolah_nama

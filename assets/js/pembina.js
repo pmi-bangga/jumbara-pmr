@@ -42,28 +42,34 @@ window.JUMBARA_PEMBINA = (() => {
               <div class="card card-red-tint">Pendaftaran sudah dikunci mulai tanggal ${J.esc(keg.hari_kunci)}.</div>
             ` : `
               <form id="form-create-kontingen">
-                <div class="field">
-                  <label>Pilih Sekolah (dari daftar Admin)</label>
-                  <select class="select" id="k-sekolah" required>
-                    <option value="">-- Pilih Sekolah --</option>
-                    ${(data.sekolah || []).map((s) => `<option value="${s.id}">${J.esc(s.nama)}</option>`).join('')}
-                  </select>
-                </div>
                 <div class="grid grid-2">
                   <div class="field">
-                    <label>Tingkat PMR</label>
+                    <label>1. Jenjang / Tingkat PMR</label>
                     <select class="select" id="k-tingkat" required>
+                      <option value="">-- Pilih Jenjang --</option>
                       ${(keg.tingkat_aktif || []).map((t) => `<option value="${J.esc(t)}">${J.esc(t)}</option>`).join('')}
                     </select>
                   </div>
                   <div class="field">
-                    <label>Jenis Kontingen</label>
-                    <select class="select" id="k-jenis" required>
-                      <option value="gabungan">Gabungan (Putra &amp; Putri)</option>
-                      <option value="putra">Putra Saja</option>
-                      <option value="putri">Putri Saja</option>
+                    <label>2. Kecamatan</label>
+                    <select class="select" id="k-kecamatan" required>
+                      <option value="">-- Pilih Jenjang dulu --</option>
                     </select>
                   </div>
+                </div>
+                <div class="field">
+                  <label>3. Pilih Sekolah (dari daftar Admin)</label>
+                  <select class="select" id="k-sekolah" required>
+                    <option value="">-- Pilih Kecamatan dulu --</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label>4. Jenis Kontingen</label>
+                  <select class="select" id="k-jenis" required>
+                    <option value="gabungan">Gabungan (Putra &amp; Putri)</option>
+                    <option value="putra">Putra Saja</option>
+                    <option value="putri">Putri Saja</option>
+                  </select>
                 </div>
                 <button type="submit" class="btn btn-primary btn-block">Daftarkan Kontingen</button>
               </form>
@@ -74,14 +80,52 @@ window.JUMBARA_PEMBINA = (() => {
 
       const f = root.querySelector('#form-create-kontingen');
       if (f) {
+        const allSchools = data.sekolah || [];
+        const selTingkat = root.querySelector('#k-tingkat');
+        const selKec = root.querySelector('#k-kecamatan');
+        const selSekolah = root.querySelector('#k-sekolah');
+
+        const populateKecamatan = () => {
+          const jenjang = selTingkat.value;
+          selSekolah.innerHTML = '<option value="">-- Pilih Kecamatan dulu --</option>';
+          if (!jenjang) {
+            selKec.innerHTML = '<option value="">-- Pilih Jenjang dulu --</option>';
+            return;
+          }
+          const matching = allSchools.filter((s) => !s.jenjang || s.jenjang.toLowerCase() === jenjang.toLowerCase());
+          const kecSet = Array.from(new Set(matching.map((s) => s.kecamatan || 'Lainnya'))).sort((a, b) => a.localeCompare(b));
+          selKec.innerHTML = '<option value="">-- Pilih Kecamatan --</option>' +
+            kecSet.map((k) => `<option value="${J.esc(k)}">${J.esc(k)}</option>`).join('');
+        };
+
+        const populateSekolah = () => {
+          const jenjang = selTingkat.value;
+          const kec = selKec.value;
+          if (!jenjang || !kec) {
+            selSekolah.innerHTML = '<option value="">-- Pilih Kecamatan dulu --</option>';
+            return;
+          }
+          const filtered = allSchools.filter((s) => {
+            const matchJenjang = !s.jenjang || s.jenjang.toLowerCase() === jenjang.toLowerCase();
+            const sKec = s.kecamatan || 'Lainnya';
+            return matchJenjang && sKec === kec;
+          }).sort((a, b) => a.nama.localeCompare(b.nama));
+
+          selSekolah.innerHTML = '<option value="">-- Pilih Sekolah (' + filtered.length + ') --</option>' +
+            filtered.map((s) => `<option value="${s.id}">${J.esc(s.nama)}${s.npsn ? ' (' + J.esc(s.npsn) + ')' : ''}</option>`).join('');
+        };
+
+        selTingkat.onchange = populateKecamatan;
+        selKec.onchange = populateSekolah;
+
         f.onsubmit = async (e) => {
           e.preventDefault();
           try {
             await J.apiFetch('pembina_create_kontingen', {
               method: 'POST',
               body: {
-                sekolah_id: Number(root.querySelector('#k-sekolah').value),
-                tingkat: root.querySelector('#k-tingkat').value,
+                sekolah_id: Number(selSekolah.value),
+                tingkat: selTingkat.value,
                 jenis: root.querySelector('#k-jenis').value,
               },
             });
