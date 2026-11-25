@@ -6,8 +6,8 @@ compatibility_date = "2025-01-01"
 directory = "."
 binding = "ASSETS"
 
-# Jika ingin binding D1 lewat wrangler.toml, hapus tanda # di bawah dan isi database_id D1 Anda:
-# [[d1_databases]]
-# binding = "DB"
-# database_name = "jumbara-pmr-db"
-# database_id = "ISI_DATABASE_ID_D1_ANDA"
+[[d1_databases]]
+binding = "DB"
+database_name = "jumbara-pmr-db"
+database_id = "c81ee6d1-1e65-417f-a76e-a036dc1abe8c"
+migrations_dir = "migrations"
