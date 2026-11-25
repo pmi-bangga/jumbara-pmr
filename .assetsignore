@@ -1,0 +1,12 @@
+api/
+api.php
+data/
+functions/
+migrations/
+src/
+wrangler.toml
+start-server.bat
+README.md
+.gitignore
+.assetsignore
+.git/

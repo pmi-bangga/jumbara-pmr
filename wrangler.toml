@@ -1,9 +1,13 @@
 name = "jumbara-pmr"
+main = "src/worker.js"
 compatibility_date = "2025-01-01"
-pages_build_output_dir = "."
 
-[[d1_databases]]
-binding = "DB"
-database_name = "jumbara-pmr-db"
-database_id = "REPLACE_WITH_YOUR_D1_DATABASE_ID"
-migrations_dir = "migrations"
+[assets]
+directory = "."
+binding = "ASSETS"
+
+# Jika ingin binding D1 lewat wrangler.toml, hapus tanda # di bawah dan isi database_id D1 Anda:
+# [[d1_databases]]
+# binding = "DB"
+# database_name = "jumbara-pmr-db"
+# database_id = "ISI_DATABASE_ID_D1_ANDA"
