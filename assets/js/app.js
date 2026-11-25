@@ -4,6 +4,7 @@
 
   let currentUser = null;
   let activeKegiatan = null;
+  let sekolahList = [];
   let authTab = 'login'; // login | register
 
   async function init() {
@@ -11,6 +12,7 @@
       const me = await J.apiFetch('auth_me');
       currentUser = me.user;
       activeKegiatan = me.kegiatan;
+      sekolahList = me.sekolah || [];
     } catch (err) {
       currentUser = null;
     }
@@ -75,6 +77,35 @@
             </div>
           ` : `
             <form id="form-register">
+              <div class="grid grid-2">
+                <div class="field">
+                  <label>1. Jenjang / Tingkat</label>
+                  <select class="select" id="r-tingkat" required>
+                    <option value="">-- Pilih Jenjang --</option>
+                    ${((activeKegiatan && activeKegiatan.tingkat_aktif) || ['Mula', 'Madya', 'Wira']).map((t) => `<option value="${J.esc(t)}">${J.esc(t)}</option>`).join('')}
+                  </select>
+                </div>
+                <div class="field">
+                  <label>2. Kecamatan</label>
+                  <select class="select" id="r-kecamatan" required>
+                    <option value="">-- Pilih Jenjang dulu --</option>
+                  </select>
+                </div>
+              </div>
+              <div class="field">
+                <label>3. Pilih Sekolah (dari daftar)</label>
+                <select class="select" id="r-sekolah" required>
+                  <option value="">-- Pilih Kecamatan dulu --</option>
+                </select>
+              </div>
+              <div class="field">
+                <label>4. Jenis Kontingen</label>
+                <select class="select" id="r-jenis" required>
+                  <option value="gabungan">Gabungan (Putra &amp; Putri)</option>
+                  <option value="putra">Putra Saja</option>
+                  <option value="putri">Putri Saja</option>
+                </select>
+              </div>
               <div class="field">
                 <label>Nama Lengkap Pembina</label>
                 <input class="input" id="r-nama" required placeholder="Nama pembina" />
@@ -133,12 +164,48 @@
 
     const fReg = app.querySelector('#form-register');
     if (fReg) {
+      const selTingkat = app.querySelector('#r-tingkat');
+      const selKec = app.querySelector('#r-kecamatan');
+      const selSekolah = app.querySelector('#r-sekolah');
+
+      selTingkat.onchange = () => {
+        const jenjang = selTingkat.value;
+        selSekolah.innerHTML = '<option value="">-- Pilih Kecamatan dulu --</option>';
+        if (!jenjang) {
+          selKec.innerHTML = '<option value="">-- Pilih Jenjang dulu --</option>';
+          return;
+        }
+        const matching = sekolahList.filter((s) => !s.jenjang || s.jenjang.toLowerCase() === jenjang.toLowerCase());
+        const kecSet = Array.from(new Set(matching.map((s) => s.kecamatan || 'Lainnya'))).sort((a, b) => a.localeCompare(b));
+        selKec.innerHTML = '<option value="">-- Pilih Kecamatan --</option>' +
+          kecSet.map((k) => `<option value="${J.esc(k)}">${J.esc(k)}</option>`).join('');
+      };
+
+      selKec.onchange = () => {
+        const jenjang = selTingkat.value;
+        const kec = selKec.value;
+        if (!jenjang || !kec) {
+          selSekolah.innerHTML = '<option value="">-- Pilih Kecamatan dulu --</option>';
+          return;
+        }
+        const filtered = sekolahList.filter((s) => {
+          const matchJenjang = !s.jenjang || s.jenjang.toLowerCase() === jenjang.toLowerCase();
+          const sKec = s.kecamatan || 'Lainnya';
+          return matchJenjang && sKec === kec;
+        }).sort((a, b) => a.nama.localeCompare(b.nama));
+        selSekolah.innerHTML = `<option value="">-- Pilih Sekolah (${filtered.length}) --</option>` +
+          filtered.map((s) => `<option value="${s.id}">${J.esc(s.nama)}${s.npsn ? ' (' + J.esc(s.npsn) + ')' : ''}</option>`).join('');
+      };
+
       fReg.onsubmit = async (e) => {
         e.preventDefault();
         try {
           const res = await J.apiFetch('auth_register_pembina', {
             method: 'POST',
             body: {
+              tingkat: selTingkat.value,
+              sekolah_id: Number(selSekolah.value),
+              jenis: app.querySelector('#r-jenis').value,
               nama: app.querySelector('#r-nama').value.trim(),
               username: app.querySelector('#r-user').value.trim(),
               no_wa: app.querySelector('#r-wa').value.trim(),
@@ -146,7 +213,7 @@
             },
           });
           currentUser = res.user;
-          J.toast('Pendaftaran akun pembina berhasil!', 'success');
+          J.toast('Pendaftaran akun pembina & kontingen berhasil!', 'success');
           render();
         } catch (err) {
           J.toast(err.message, 'error');

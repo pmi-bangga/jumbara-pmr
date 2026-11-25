@@ -1,9 +1,11 @@
 import {
   nowIso,
+  todayDate,
   jsonResponse,
   jsonError,
   getJsonBody,
   normalizeWa,
+  tingkatPrefix,
   hashPassword,
   verifyPassword,
   checkPublicRateLimit,
@@ -164,7 +166,8 @@ export async function onRequest(context) {
     if (action === 'auth_me') {
       const user = await getOptionalAuth(env, request);
       const kegiatan = await getActiveKegiatan(db);
-      return jsonResponse({ ok: true, user, kegiatan });
+      const { results: sekolah } = await db.prepare('SELECT id, nama, npsn, jenjang, kecamatan FROM sekolah ORDER BY kecamatan ASC, nama ASC').all();
+      return jsonResponse({ ok: true, user, kegiatan, sekolah: sekolah || [] });
     }
 
     if (action === 'auth_login') {
@@ -199,6 +202,9 @@ export async function onRequest(context) {
       const username = String(body.username || '').trim().toLowerCase();
       const wa = normalizeWa(body.no_wa || '');
       const password = String(body.password || '');
+      const sekolahId = Number(body.sekolah_id || 0);
+      const tingkat = String(body.tingkat || '').trim();
+      const jenis = String(body.jenis || 'gabungan').trim();
 
       if (!nama || !/^[a-z0-9_.-]{3,30}$/.test(username) || !wa || password.length < 6) {
         return jsonError('Nama, username (huruf/angka 3-30 karakter), nomor WhatsApp wajib, dan password minimal 6 karakter harus diisi.', 400);
@@ -209,14 +215,55 @@ export async function onRequest(context) {
         return jsonError('Username sudah terdaftar.', 400);
       }
 
+      const kegiatan = await getActiveKegiatan(db);
+      let school = null;
+      if (kegiatan) {
+        if (sekolahId <= 0 || !['Mula', 'Madya', 'Wira'].includes(tingkat) || !['putra', 'putri', 'gabungan'].includes(jenis)) {
+          return jsonError('Jenjang, kecamatan, sekolah, dan jenis kontingen wajib dipilih.', 400);
+        }
+        if (!kegiatan.tingkat_aktif.includes(tingkat)) {
+          return jsonError(`Tingkat ${tingkat} tidak aktif pada kegiatan tahun ini.`, 400);
+        }
+        if (todayDate() >= kegiatan.hari_kunci) {
+          return jsonError('Pendaftaran sudah dikunci mulai hari kunci.', 403);
+        }
+        school = await db.prepare('SELECT id, nama FROM sekolah WHERE id = ?').bind(sekolahId).first();
+        if (!school) {
+          return jsonError('Sekolah tidak ditemukan dalam daftar admin.', 400);
+        }
+        const { results: schKontingens } = await db.prepare('SELECT jenis FROM kontingen WHERE kegiatan_id = ? AND sekolah_id = ?').bind(kegiatan.id, sekolahId).all();
+        const existingJenis = (schKontingens || []).map((r) => r.jenis);
+        if (existingJenis.includes('gabungan') || (jenis === 'gabungan' && existingJenis.length > 0) || existingJenis.includes(jenis)) {
+          return jsonError('Sekolah ini sudah memiliki kontingen untuk jenis tersebut (maksimal 1 gabungan, atau 1 putra dan 1 putri terpisah).', 400);
+        }
+      }
+
+      const now = nowIso();
       const pwHash = await hashPassword(password);
       const res = await db.prepare(
         "INSERT INTO akun (username, nama, peran, no_wa, password_hash, wajib_ganti_password, created_at) VALUES (?, ?, 'pembina', ?, ?, 0, ?)"
-      ).bind(username, nama, wa, pwHash, nowIso()).run();
+      ).bind(username, nama, wa, pwHash, now).run();
       const newId = Number(res.meta.last_row_id);
 
       const actor = { id: newId, nama, peran: 'pembina' };
       await writeLog(db, actor, 'pendaftaran_pembina', `Akun pembina baru mendaftar: ${nama} (@${username}, WA: ${wa}).`, `akun:${newId}`);
+
+      if (kegiatan && school) {
+        const prefix = tingkatPrefix(tingkat);
+        const { results: kCodes } = await db.prepare('SELECT kode FROM kontingen WHERE kegiatan_id = ? AND kode LIKE ?').bind(kegiatan.id, `${prefix}%`).all();
+        let maxNum = 0;
+        for (const row of kCodes || []) {
+          const num = parseInt(String(row.kode).slice(2), 10) || 0;
+          if (num > maxNum) maxNum = num;
+        }
+        const kode = `${prefix}${String(maxNum + 1).padStart(3, '0')}`;
+        const kRes = await db.prepare(`
+          INSERT INTO kontingen (kegiatan_id, sekolah_id, tingkat, jenis, kode, pembina_id, status, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, 'terbuka', ?)
+        `).bind(kegiatan.id, sekolahId, tingkat, jenis, kode, newId, now).run();
+        const kid = Number(kRes.meta.last_row_id);
+        await writeLog(db, actor, 'pendaftaran_kontingen', `Kontingen ${kode} (${school.nama} - ${tingkat} ${jenis}) didaftarkan.`, `kontingen:${kid}`, kode);
+      }
 
       const cookie = await createSessionCookie(newId, env, request);
       return jsonResponse({
