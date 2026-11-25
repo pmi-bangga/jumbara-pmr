@@ -234,7 +234,9 @@ button, input, select, textarea {
   flex-shrink: 0;
 }
 .brand-title { font-family: var(--font-display); font-weight: 800; font-size: 1rem; color: var(--text-heading); line-height: 1.15; }
-.brand-sub { font-size: 0.75rem; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.brand-sub { font-size: 0.75rem; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px; }
+.show-mobile { display: none; }
+.hide-mobile { display: inline; }
 
 /* Admin Layout with Collapsible Left Sidebar */
 .admin-shell {
@@ -574,6 +576,18 @@ tr:last-child td { border-bottom: none; }
     padding: 8px;
   }
   .nav-item { width: auto; white-space: nowrap; }
+}
+
+@media (max-width: 520px) {
+  .topbar { padding: 8px 10px; gap: 8px; flex-wrap: wrap; }
+  .brand { gap: 8px; }
+  .brand-mark, .brand-logo { width: 30px; height: 30px; }
+  .brand-title { font-size: 0.85rem; }
+  .brand-sub { font-size: 0.68rem; max-width: 120px; }
+  .show-mobile { display: inline; }
+  .hide-mobile { display: none; }
+  .topbar .btn-sm { font-size: 0.72rem; padding: 4px 8px; }
+  .topbar .row-gap { gap: 6px; }
 }
 
 @media print {

@@ -25,14 +25,14 @@
         <div class="brand">
           ${J.pmiLogoHtml(36)}
           <div style="min-width:0; border-left:1px solid var(--pmi-gray-lighter); padding-left:12px;">
-            <div class="brand-title">SIJUM | Sistem Informasi Jumbara</div>
+            <div class="brand-title"><span class="hide-mobile">SIJUM | Sistem Informasi Jumbara</span><span class="show-mobile">SIJUM</span></div>
             <div class="brand-sub">${J.esc(activeKegiatan ? activeKegiatan.nama : 'PMI Kabupaten Purbalingga')}</div>
           </div>
         </div>
         <div class="row-gap">
           ${J.themeToggleButtonHtml()}
           ${currentUser ? `
-            <div style="text-align:right; line-height:1.2;">
+            <div style="text-align:right; line-height:1.2;" class="hide-mobile">
               <div class="fw-bold" style="font-size:0.86rem;">${J.esc(currentUser.nama)}</div>
               <div class="text-muted" style="font-size:0.74rem; text-transform:uppercase;">${J.esc(currentUser.peran)}</div>
             </div>
