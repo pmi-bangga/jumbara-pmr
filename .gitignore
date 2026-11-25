@@ -1,0 +1,23 @@
+# Cloudflare / Wrangler
+.wrangler/
+.dev.vars
+node_modules/
+
+# Database lokal (jangan upload data sensitif)
+data/*.sqlite
+data/*.sqlite-wal
+data/*.sqlite-shm
+
+# OS files
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
