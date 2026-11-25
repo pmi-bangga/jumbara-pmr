@@ -25,7 +25,7 @@
         <div class="brand">
           ${J.pmiLogoHtml(36)}
           <div style="min-width:0; border-left:1px solid var(--pmi-gray-lighter); padding-left:12px;">
-            <div class="brand-title">JUMBARA PMR</div>
+            <div class="brand-title">SIJUM | Sistem Informasi Jumbara</div>
             <div class="brand-sub">${J.esc(activeKegiatan ? activeKegiatan.nama : 'PMI Kabupaten Purbalingga')}</div>
           </div>
         </div>
